@@ -1,0 +1,10 @@
+F:\GitHub\Public\GenericRest\GenericRest\obj\Debug\netstandard2.0\GenericRest.vbproj.AssemblyReference.cache
+F:\GitHub\Public\GenericRest\GenericRest\obj\Debug\netstandard2.0\GenericRest.GeneratedMSBuildEditorConfig.editorconfig
+F:\GitHub\Public\GenericRest\GenericRest\obj\Debug\netstandard2.0\GenericRest.AssemblyInfoInputs.cache
+F:\GitHub\Public\GenericRest\GenericRest\obj\Debug\netstandard2.0\GenericRest.AssemblyInfo.vb
+F:\GitHub\Public\GenericRest\GenericRest\obj\Debug\netstandard2.0\GenericRest.vbproj.CoreCompileInputs.cache
+F:\GitHub\Public\GenericRest\GenericRest\obj\Debug\netstandard2.0\GenericRest.dll
+F:\GitHub\Public\GenericRest\GenericRest\obj\Debug\netstandard2.0\GenericRest.pdb
+F:\GitHub\Public\GenericRest\GenericRest\bin\Debug\netstandard2.0\GenericRest.deps.json
+F:\GitHub\Public\GenericRest\GenericRest\bin\Debug\netstandard2.0\GenericRest.dll
+F:\GitHub\Public\GenericRest\GenericRest\bin\Debug\netstandard2.0\GenericRest.pdb
