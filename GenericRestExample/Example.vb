@@ -2,24 +2,25 @@ Imports Generic
 
 Public Class Example
 
-
-    Public Function GetData(RequestIDList As List(Of Integer)) As List(Of Integer)
-
-        'Your request will have a body of a list of integers
-
-        'BaseURL = The URL of the service
-        'MethodName = "Name of the Method on the service (ie service/method
-        'Here I am passing in Nothing for the Param value, params are added to the end of the URL like: http://service/method/{Param1}/{Param2} ect
-        'RequestIDList is the list of integers you are passing to the rest service in the body
-
-        Using req As RestPost(Of List(Of Integer)) = New RestPost(Of List(Of Integer))("http://serviceURL", "MethodName", Nothing, RequestIDList)
-            'your response will be the returned value from the service, in a list of integers
-            'note: you need to know what the service is going to return, it can't process any other response
-            'The first value is what you are sending (list of Integer) the second value is what you are getting back (list of Integer)
-            Return RestUtil.GetResponse(Of List(Of Integer), List(Of Integer))(req)
+    ' Retrieve a list of users via GET
+    Public Function GetUsers() As List(Of User)
+        ' This would send a GET request to: https://api.myapp.com/users
+        Using req As New RestGet("https://api.myapp.com", "users", Nothing)
+            Return RestUtil.GetResponse(Of List(Of User))(req)
         End Using
+    End Function
 
+    ' Submit a new order via POST
+    Public Function SubmitOrder(customerId As Integer, itemIds As List(Of Integer)) As OrderResponse
+        Dim order As New CreateOrderRequest With {
+            .CustomerId = customerId,
+            .ItemIds = itemIds
+        }
 
+        ' POST to: https://api.myapp.com/orders
+        Using req As New RestPost(Of CreateOrderRequest, OrderResponse)("https://api.myapp.com", "orders", Nothing, order)
+            Return RestUtil.GetResponse(Of CreateOrderRequest, OrderResponse)(req)
+        End Using
     End Function
 
 End Class
