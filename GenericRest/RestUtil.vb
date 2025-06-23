@@ -1,6 +1,9 @@
 Imports System.IO
 Imports System.Net
+Imports System.Net.Http
+Imports System.Text
 Imports Newtonsoft.Json
+Imports Newtonsoft.Json.Serialization
 
 Public Class RestUtil
     Public Shared ResultResponse As String
@@ -8,6 +11,7 @@ Public Class RestUtil
     Private Shared _DefaultConnectionLimit As Integer = 1000
     Private Shared _MaxServicePoints As Integer = 1000
     Private Shared _MaxServicePointIdleTime As Integer = 10000
+    Public Shared Property RequestTimeout As Integer = 10000
 
     Public Shared Property DefaultConnectionLimit As Integer
         Get
@@ -38,8 +42,13 @@ Public Class RestUtil
 
 
     Public Shared Function GetResponse(Of T1, T2)(RestRequest As RestPost(Of T1)) As T2
-        Dim result As String = RestUtil.ProcessPostRequest(RestRequest.URL, JsonConvert.SerializeObject(RestRequest.MessageBody), RestRequest.Cookies)
+        Dim result As String = RestUtil.ProcessPostRequest(RestRequest.URL, JsonConvert.SerializeObject(RestRequest.MessageBody), RestRequest.Cookies, RestRequest.Headers)
         Try
+
+            If GetType(T2) Is GetType(String) Then
+                Return DirectCast(DirectCast(result, Object), T2)
+            End If
+
             Return JsonConvert.DeserializeObject(Of T2
             )(result)
         Catch ex As Exception
@@ -47,9 +56,34 @@ Public Class RestUtil
         End Try
 
     End Function
-    Public Shared Function GetResponse(Of T)(RestRequest As RestPost) As T
-        Dim result As String = RestUtil.ProcessPostRequest(RestRequest.URL, JsonConvert.SerializeObject(Nothing), RestRequest.Cookies)
+
+    Public Shared Async Function GetResponseAsync(Of T1, T2)(RestRequest As RestPost(Of T1)) As Task(Of T2)
+        RestUtil.RequestTimeout = 100000
+        Dim result As String = Await RestUtil.ProcessPostRequestAsync(RestRequest.URL, JsonConvert.SerializeObject(RestRequest.MessageBody), RestRequest.Cookies, RestRequest.Headers)
         Try
+
+
+            If GetType(T2) Is GetType(String) Then
+                Return DirectCast(DirectCast(result, Object), T2)
+            End If
+
+            Return JsonConvert.DeserializeObject(Of T2
+            )(result)
+        Catch ex As Exception
+            Throw New Exception(result)
+        End Try
+
+    End Function
+
+    Public Shared Function GetResponse(Of T)(RestRequest As RestPost(Of T)) As T
+        Dim result As String = RestUtil.ProcessPostRequest(RestRequest.URL, JsonConvert.SerializeObject(Nothing), RestRequest.Cookies, RestRequest.Headers)
+        Try
+
+
+            If GetType(T) Is GetType(String) Then
+                Return DirectCast(DirectCast(result, Object), T)
+            End If
+
             Return JsonConvert.DeserializeObject(Of T
             )(result)
         Catch ex As Exception
@@ -57,31 +91,93 @@ Public Class RestUtil
         End Try
     End Function
 
-    Public Shared Sub GetResponse(Of T)(RestRequest As RestPost(Of T))
+    Public Shared Async Function GetResponseAsync(Of T)(RestRequest As RestPost(Of T)) As Task(Of T)
+        Dim result As String = Await RestUtil.ProcessPostRequestAsync(RestRequest.URL, JsonConvert.SerializeObject(Nothing), RestRequest.Cookies, RestRequest.Headers)
+        Try
 
-        ResultResponse = RestUtil.ProcessPostRequest(RestRequest.URL, JsonConvert.SerializeObject(RestRequest.MessageBody), RestRequest.Cookies)
 
-    End Sub
+            If GetType(T) Is GetType(String) Then
+                Return DirectCast(DirectCast(result, Object), T)
+            End If
+
+            Return JsonConvert.DeserializeObject(Of T
+            )(result)
+        Catch ex As Exception
+            Throw New Exception(result)
+        End Try
+    End Function
+
+    'Public Shared Sub GetResponse(Of T)(RestRequest As RestPost(Of T))
+
+    '    ResultResponse = RestUtil.ProcessPostRequest(RestRequest.URL, JsonConvert.SerializeObject(RestRequest.MessageBody), RestRequest.Cookies, RestRequest.Headers)
+
+    'End Sub
     Public Shared Function GetResponse(Of T)(RestRequest As RestGet) As T
-        Dim result As String = RestUtil.ProcessGetRequest(RestRequest.URL, RestRequest.Cookies)
+        Dim result As String = RestUtil.ProcessGetRequest(RestRequest.URL, RestRequest.Cookies, RestRequest.Headers)
         Try
+
+            If GetType(T) Is GetType(String) Then
+                Return DirectCast(DirectCast(result, Object), T)
+            End If
+
             Return JsonConvert.DeserializeObject(Of T
             )(result)
         Catch ex As Exception
-            Throw New Exception(result)
+            Dim TheEx As Exception = New Exception(ex.Message, ex)
+            TheEx.Data.Add("Response", result)
+            Throw TheEx
         End Try
     End Function
+    Public Shared Async Function GetResponseAsync(Of T)(RestRequest As RestGet) As Task(Of T)
+        Dim result As String = Await RestUtil.ProcessGetRequestAsync(RestRequest.URL, RestRequest.Cookies, RestRequest.Headers)
+        Try
+
+            If GetType(T) Is GetType(String) Then
+                Return DirectCast(DirectCast(result, Object), T)
+            End If
+
+            Dim settings As New JsonSerializerSettings With {
+    .ContractResolver = New DefaultContractResolver With {
+        .NamingStrategy = New SnakeCaseNamingStrategy()
+    }
+}
+
+            Return JsonConvert.DeserializeObject(Of T
+            )(result, settings)
+
+        Catch ex As Exception
+            Dim TheEx As Exception = New Exception(ex.Message, ex)
+            TheEx.Data.Add("Response", result)
+            Throw TheEx
+        End Try
+    End Function
+
     Public Shared Sub GetResponse(RestRequest As RestGet)
 
-        ResultResponse = RestUtil.ProcessGetRequest(RestRequest.URL, RestRequest.Cookies)
+        ResultResponse = RestUtil.ProcessGetRequest(RestRequest.URL, RestRequest.Cookies, RestRequest.Headers)
 
     End Sub
+
+    Public Shared Async Sub GetResponseAsyc(RestRequest As RestGet)
+
+        ResultResponse = Await RestUtil.ProcessGetRequestAsync(RestRequest.URL, RestRequest.Cookies, RestRequest.Headers)
+
+    End Sub
+
+
+
 
     Public Shared Sub GetResponse(RestRequest As RestPost)
 
-        ResultResponse = RestUtil.ProcessPostRequest(RestRequest.URL, Nothing, RestRequest.Cookies)
+        ResultResponse = RestUtil.ProcessPostRequest(RestRequest.URL, Nothing, RestRequest.Cookies, RestRequest.Headers)
 
     End Sub
+    Public Shared Async Sub GetResponseAsync(RestRequest As RestPost)
+
+        ResultResponse = Await RestUtil.ProcessPostRequestAsync(RestRequest.URL, Nothing, RestRequest.Cookies, RestRequest.Headers)
+
+    End Sub
+
 
     Public Shared Function GetObjectJson(O As Object) As String
         Try
@@ -91,7 +187,52 @@ Public Class RestUtil
         End Try
     End Function
 
-    Public Shared Function ProcessPostRequest(restURL As String, bodyContent As String, Cookies As List(Of KeyValuePair(Of String, String))) As String
+    Public Shared Async Function ProcessPostRequestAsync(restURL As String, bodyContent As String, Cookies As List(Of KeyValuePair(Of String, String)), Headers As List(Of KeyValuePair(Of String, String))) As Task(Of String)
+        Dim responseString As String = String.Empty
+
+        Try
+            Using httpClient As New HttpClient()
+                ' Configure the HttpClient timeout
+                httpClient.Timeout = TimeSpan.FromMilliseconds(RequestTimeout)
+
+                ' Add headers
+                If Headers IsNot Nothing AndAlso Headers.Count > 0 Then
+                    For Each header In Headers
+                        httpClient.DefaultRequestHeaders.Add(header.Key, header.Value)
+                    Next
+                End If
+
+                ' Add cookies if provided
+                If Cookies IsNot Nothing AndAlso Cookies.Count > 0 Then
+                    Dim cookieHeader = String.Join("; ", Cookies.Select(Function(c) $"{c.Key}={c.Value}"))
+                    httpClient.DefaultRequestHeaders.Add("Cookie", cookieHeader)
+                End If
+
+                ' Set up the request content
+                Dim content As New StringContent(bodyContent, Encoding.UTF8, "application/json")
+
+                ' Send the POST request
+                Using response As HttpResponseMessage = Await httpClient.PostAsync(restURL, content)
+                    ' Ensure the response status code is successful
+                    response.EnsureSuccessStatusCode()
+
+                    ' Read the response content
+                    responseString = Await response.Content.ReadAsStringAsync()
+                End Using
+            End Using
+
+        Catch ex As HttpRequestException
+            responseString &= $"HTTP Request Exception: {ex.Message}"
+        Catch ex As TaskCanceledException
+            responseString &= "Request timed out."
+        Catch ex As Exception
+            responseString &= $"Unexpected error: {ex.Message}"
+        End Try
+
+        Return responseString
+    End Function
+
+    Public Shared Function ProcessPostRequest(restURL As String, bodyContent As String, Cookies As List(Of KeyValuePair(Of String, String)), Headers As List(Of KeyValuePair(Of String, String))) As String
         Dim responseString As String = String.Empty
 
         Try
@@ -99,8 +240,10 @@ Public Class RestUtil
             request.UseDefaultCredentials = True
             request.Method = "POST"
             request.ContentType = "application/json"
+            request.Timeout = RequestTimeout
 
-            Dim CookieContents As String = AddCookies(request, Cookies)
+            AddCookies(request, Cookies)
+            AddHeaders(request, Headers)
 
             SetServicePointConnections()
 
@@ -130,31 +273,90 @@ Public Class RestUtil
         Return responseString
 
     End Function
-
-    Private Shared Function AddCookies(ByRef request As HttpWebRequest, cookies As List(Of KeyValuePair(Of String, String))) As String
-        Dim CookieContents As String = ""
-
-        If (Not Debugger.IsAttached) Then
-            If cookies IsNot Nothing AndAlso cookies.Count > 0 Then
-                request.CookieContainer = New CookieContainer
-                For Each cookie In cookies
-                    request.CookieContainer.Add(New Net.Cookie(cookie.Key, cookie.Value, "/", request.Host))
-                    CookieContents &= " Key: " & cookie.Key & " Value: " & cookie.Value
-                Next
-            End If
+    Private Shared Sub AddHeaders(ByRef request As HttpWebRequest, Headers As List(Of KeyValuePair(Of String, String)))
+        If Headers IsNot Nothing AndAlso Headers.Count > 0 Then
+            For Each Header In Headers
+                request.Headers(Header.Key) = Header.Value
+            Next
         End If
-        Return CookieContents
+    End Sub
+
+    Private Shared Sub AddCookies(ByRef request As HttpWebRequest, cookies As List(Of KeyValuePair(Of String, String)))
+        Dim Host As String
+
+        If request.Host.StartsWith("localhost:") Then
+            Host = "." & System.Net.NetworkInformation.IPGlobalProperties.GetIPGlobalProperties().DomainName
+        Else
+            Host = request.Host
+        End If
+
+        If cookies IsNot Nothing AndAlso cookies.Count > 0 Then
+            request.CookieContainer = New CookieContainer
+            For Each cookie In cookies
+                request.CookieContainer.Add(New Net.Cookie(cookie.Key, cookie.Value, "/", Host))
+            Next
+        End If
+    End Sub
+
+    Public Shared Async Function ProcessGetRequestAsync(restURL As String, cookies As List(Of KeyValuePair(Of String, String)), Headers As List(Of KeyValuePair(Of String, String))) As Task(Of String)
+        Dim responseString As String = String.Empty
+
+        Try
+            Using httpClient As New HttpClient()
+                ' Configure the HttpClient timeout
+                httpClient.Timeout = TimeSpan.FromMilliseconds(RequestTimeout)
+
+                ' Add headers
+                If Headers IsNot Nothing AndAlso Headers.Count > 0 Then
+                    For Each header In Headers
+                        httpClient.DefaultRequestHeaders.Add(header.Key, header.Value)
+                    Next
+                End If
+
+                ' Add cookies if provided
+                If cookies IsNot Nothing AndAlso cookies.Count > 0 Then
+                    Dim cookieHeader = String.Join("; ", cookies.Select(Function(c) $"{c.Key}={c.Value}"))
+                    httpClient.DefaultRequestHeaders.Add("Cookie", cookieHeader)
+                End If
+
+                ' Send the GET request
+                Using response As HttpResponseMessage = Await httpClient.GetAsync(restURL)
+                    ' Ensure the response status code is successful
+                    response.EnsureSuccessStatusCode()
+
+                    ' Read the response content
+                    responseString = Await response.Content.ReadAsStringAsync()
+                End Using
+            End Using
+
+        Catch ex As HttpRequestException
+            responseString &= $"HTTP Request Exception: {ex.Message}"
+        Catch ex As TaskCanceledException
+            responseString &= "Request timed out."
+        Catch ex As Exception
+            responseString &= $"Unexpected error: {ex.Message}"
+        End Try
+
+        Return responseString
     End Function
 
-    Public Shared Function ProcessGetRequest(restURL As String, cookies As List(Of KeyValuePair(Of String, String))) As String
+    Public Shared Function ProcessGetRequest(restURL As String, cookies As List(Of KeyValuePair(Of String, String)), Headers As List(Of KeyValuePair(Of String, String))) As String
         Dim responseString As String = String.Empty
         Try
             Dim request As HttpWebRequest = WebRequest.Create(restURL)
             request.UseDefaultCredentials = True
             request.Method = "GET"
             request.ContentType = "application/json"
+            request.Timeout = RequestTimeout
 
-            Dim CookieContents As String = AddCookies(request, cookies)
+            'If Headers IsNot Nothing Then
+            '    For Each Item In Headers
+            '        request.Headers("MyHeaderKey") = "MyHeaderValue"
+            '    Next
+            'End If
+
+            AddCookies(request, cookies)
+            AddHeaders(request, Headers)
 
             SetServicePointConnections()
 

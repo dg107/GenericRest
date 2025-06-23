@@ -11,8 +11,8 @@ End Enum
 Public MustInherit Class RestRequest(Of T)
     Inherits RestRequest
     Private _Body As T
-    Friend Sub New(BaseURL As String, Method As String, Parm As List(Of String), Body As T, RequestType As RestRequestType, Optional Cookies As List(Of KeyValuePair(Of String, String)) = Nothing)
-        MyBase.New(BaseURL, Method, Parm, RequestType, Cookies)
+    Friend Sub New(BaseURL As String, Method As String, Parm As List(Of String), Body As T, RequestType As RestRequestType, Optional Cookies As List(Of KeyValuePair(Of String, String)) = Nothing, Optional Headers As List(Of KeyValuePair(Of String, String)) = Nothing)
+        MyBase.New(BaseURL, Method, Parm, RequestType, Cookies, Headers)
         _Body = Body
     End Sub
 
@@ -33,6 +33,7 @@ Public MustInherit Class RestRequest
     Private _Param As String
     Private _RequestType As RestRequestType
     Private _Cookies As List(Of KeyValuePair(Of String, String))
+    Private _Headers As List(Of KeyValuePair(Of String, String))
 
     Friend ReadOnly Property RequestType As RestRequestType
         Get
@@ -40,20 +41,33 @@ Public MustInherit Class RestRequest
         End Get
     End Property
 
-    Friend Sub New(BaseURL As String, Method As String, RequestType As RestRequestType, Cookies As List(Of KeyValuePair(Of String, String)))
+    Friend Sub New(BaseURL As String, Method As String, RequestType As RestRequestType, Cookies As List(Of KeyValuePair(Of String, String)), Headers As List(Of KeyValuePair(Of String, String)))
         _BaseURL = BaseURL
         _Method = Method
         _Param = ""
         _RequestType = RequestType
-        _Cookies = Cookies
+        If Cookies Is Nothing Then _Cookies = New List(Of KeyValuePair(Of String, String)) Else _Cookies = Cookies
+        If Headers Is Nothing Then _Headers = New List(Of KeyValuePair(Of String, String)) Else _Headers = Headers
     End Sub
 
-    Friend Sub New(BaseURL As String, Method As String, Parm As List(Of String), RequestType As RestRequestType, Cookies As List(Of KeyValuePair(Of String, String)))
+
+
+    Friend Sub New(BaseURL As String, Method As String, Parm As List(Of String), RequestType As RestRequestType, Cookies As List(Of KeyValuePair(Of String, String)), Headers As List(Of KeyValuePair(Of String, String)))
         _BaseURL = BaseURL
         _Method = Method
         _Param = ParmURL(Parm)
         _RequestType = RequestType
-        _Cookies = Cookies
+        If Cookies Is Nothing Then _Cookies = New List(Of KeyValuePair(Of String, String)) Else _Cookies = Cookies
+        If Headers Is Nothing Then _Headers = New List(Of KeyValuePair(Of String, String)) Else _Headers = Headers
+    End Sub
+
+    Friend Sub New(BaseURL As String, Parm As List(Of String), RequestType As RestRequestType, Cookies As List(Of KeyValuePair(Of String, String)), Headers As List(Of KeyValuePair(Of String, String)))
+        _BaseURL = BaseURL
+        _Method = ""
+        _Param = ParmURL(Parm)
+        _RequestType = RequestType
+        If Cookies Is Nothing Then _Cookies = New List(Of KeyValuePair(Of String, String)) Else _Cookies = Cookies
+        If Headers Is Nothing Then _Headers = New List(Of KeyValuePair(Of String, String)) Else _Headers = Headers
     End Sub
 
 
@@ -63,23 +77,33 @@ Public MustInherit Class RestRequest
         If Parm IsNot Nothing Then
 
             For Each p In Parm
-                Parms &= "/" & HttpUtility.UrlEncode(p)
+                Parms &= "/" & p
             Next
         End If
+        Parms = Uri.EscapeUriString(Parms)
 
         Return Parms
     End Function
 
     Public ReadOnly Property URL As String
         Get
+            If _Method = "" And _Param = "" Then
+                Return _BaseURL
+            End If
+
             Return _BaseURL & "/" & _Method & _Param
         End Get
     End Property
 
     Public ReadOnly Property Cookies As List(Of KeyValuePair(Of String, String))
         Get
-            If _Cookies Is Nothing Then _Cookies = New List(Of KeyValuePair(Of String, String))
             Return _Cookies
+        End Get
+    End Property
+
+    Public ReadOnly Property Headers As List(Of KeyValuePair(Of String, String))
+        Get
+            Return _Headers
         End Get
     End Property
 
